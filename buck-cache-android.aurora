@@ -1,0 +1,66 @@
+import os
+ 
+class Profile(Struct):
+  name                = Required(String)
+  role                = Default(String, os.environ['USER'])
+  contact             = Default(String, '{}@twitter.com'.format(os.environ['USER']))
+  environment         = Required(String)
+  pkg_version         = Default(String, 'latest')
+ 
+ 
+# run the script
+resources = Resources(
+  cpu = 4,
+  ram = 8*GB,
+  disk = 16*GB
+)
+
+# copy hello_world.py locally
+install = Packer.install('buck-http-cache-android', version='{{profile.pkg_version}}')
+
+main = JVMProcess(
+  name = 'buck-http-cache-android',
+  jvm = Java8(
+    heap = 7*GB,
+    metaspace = 256*MB,
+    extra_jvm_flags = '-Djava.net.preferIPv4Stack=true'
+      ' -Xmx16g'
+      ' -XX:MaxGCPauseMillis=100'
+      ' -XX:MaxDirectMemorySize=6g'
+      ' -Dlog.home=logs'
+  ),
+  arguments = '-jar package/cache-1.0.0-standalone.jar'
+    ' server'
+    ' package/standalone.yml',
+  resources = resources
+)
+
+  
+# describe the task
+hello_world_task = SequentialTask(
+  processes = [install, main],
+  resources = resources
+)
+ 
+# describe the service
+hello_world_service = Service(
+  contact='{{profile.contact}}',
+  cluster='{{cluster}}',
+  environment='{{profile.environment}}',
+  role='{{profile.role}}',
+  name='{{profile.name}}',
+  task=hello_world_task,
+  update_config=UpdateConfig(),
+  announce=Announcer()
+)
+ 
+# you may eventually have a staging & prod profile as well
+Devel = Profile(
+  name = 'buck-http-cache-android',
+  environment = 'devel',
+  pkg_version = 4
+)
+ 
+jobs = [
+  hello_world_service(cluster='smf1', instances=1).bind(profile=Devel)
+]

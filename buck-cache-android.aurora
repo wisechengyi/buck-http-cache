@@ -58,7 +58,7 @@ hello_world_service = Service(
 Devel = Profile(
   name = 'buck-http-cache-android',
   environment = 'devel',
-  pkg_version = 5
+  pkg_version = 6
 )
  
 jobs = [
